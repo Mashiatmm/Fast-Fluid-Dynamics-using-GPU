@@ -20,21 +20,11 @@ float delx = 1 / res.x;
 float dely = 1 / res.y;
 
 
-#define DENSITY 1
-#define VISCOSITY 1
-#define FORCEMULT 0.3
-
-
-
 void main() {
-    vec4 force = vec4(0);
-    if (mDown != 0) {
-        vec2 orgPos = mpos / res; // original mouse position rescaled
-        vec2 relMmt = rel / res; // relative mouse motion rescaled
-
-        vec2 F = relMmt * FORCEMULT;
-
-        force = vec4(F*1/distance(coords, orgPos), 0, 0);
-    }
-    fragColor = texture(velTex, coords) + force;
+    vec4 v = texture(velTex, coords);
+    vec4 t = texture(tmpTex, coords);
+    vec4 p = texture(prsTex, coords);
+    vec4 q = texture(qntTex, coords);
+    fragColor = vec4(q.xyz, 1);
+    //fragColor = vec4(1, 0, 0, 1);
 }

@@ -177,11 +177,12 @@ void setShaders()
     unsigned int fragmentShader = compileShader("sh_f.glsl", GL_FRAGMENT_SHADER);
     unsigned int advectFragShader = compileShader("shader/advStep.glsl", GL_FRAGMENT_SHADER);
     unsigned int forceFragShader = compileShader("shader/forceStep.glsl", GL_FRAGMENT_SHADER);
-
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
+    unsigned int diffusionFragShader = compileShader("shader/diffusionStep.glsl", GL_FRAGMENT_SHADER);
+    unsigned int fluidFragShader = compileShader("shader/fluid_fs.glsl", GL_FRAGMENT_SHADER);
+    unsigned int divergenceShader = compileShader("shader/divergence.glsl", GL_FRAGMENT_SHADER);
+    unsigned int pressureFragShader = compileShader("shader/pressure.glsl", GL_FRAGMENT_SHADER);
+    unsigned int gradientShader = compileShader("shader/gradient.glsl", GL_FRAGMENT_SHADER);
+    unsigned int boundaryShader = compileShader("shader/boundary.glsl", GL_FRAGMENT_SHADER);
 
     hfShader->advStep = glCreateProgram();
     glAttachShader(hfShader->advStep, fluidVShader);
@@ -190,13 +191,50 @@ void setShaders()
 
     hfShader->frcStep = glCreateProgram();
     glAttachShader(hfShader->frcStep, fluidVShader);
-    glAttachShader(hfShader->frcStep, advectFragShader);
+    glAttachShader(hfShader->frcStep, forceFragShader);
     glLinkProgram(hfShader->frcStep);
+
+    hfShader->diffStep = glCreateProgram();
+    glAttachShader(hfShader->diffStep, fluidVShader);
+    glAttachShader(hfShader->diffStep, diffusionFragShader);
+    glLinkProgram(hfShader->diffStep);
+
+    hfShader->divStep = glCreateProgram();
+    glAttachShader(hfShader->divStep, fluidVShader);
+    glAttachShader(hfShader->divStep, divergenceShader);
+    glLinkProgram(hfShader->divStep);
+
+    hfShader->prsStep = glCreateProgram();
+    glAttachShader(hfShader->prsStep, fluidVShader);
+    glAttachShader(hfShader->prsStep, pressureFragShader);
+    glLinkProgram(hfShader->prsStep);
+
+    hfShader->grdStep = glCreateProgram();
+    glAttachShader(hfShader->grdStep, fluidVShader);
+    glAttachShader(hfShader->grdStep, gradientShader);
+    glLinkProgram(hfShader->grdStep);
+
+    hfShader->fluidStep = glCreateProgram();
+    glAttachShader(hfShader->fluidStep, fluidVShader);
+    glAttachShader(hfShader->fluidStep, fluidFragShader);
+    glLinkProgram(hfShader->fluidStep);
+
+    hfShader->boundaryStep = glCreateProgram();
+    glAttachShader(hfShader->boundaryStep, fluidVShader);
+    glAttachShader(hfShader->boundaryStep, boundaryShader);
+    glLinkProgram(hfShader->boundaryStep);
+
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
     glDeleteShader(advectFragShader);
     glDeleteShader(forceFragShader);
+    glDeleteShader(diffusionFragShader);
+    glDeleteShader(divergenceShader);
+    glDeleteShader(pressureFragShader);
+    glDeleteShader(gradientShader);
+    glDeleteShader(fluidFragShader);
+    glDeleteShader(boundaryShader);
 }
 
 void display()
@@ -247,6 +285,14 @@ void display()
 
         hfShader->advectionStep();
         hfShader->forceStep();
+        hfShader->diffusionStep();
+        hfShader->divergenceStep();
+        hfShader->pressureStep();
+        hfShader->gradientStep();
+        hfShader->boundaryVelStep(hfShader->curVel, -1.0);
+        hfShader->boundaryVelStep(hfShader->curPrs, 1);
+        hfShader->visFluidStep();
+        // hfShader->visualizeGBuffer(hfShader->nxtVel->FBO);
 
         // Render ImGui
         ImGui::Render();

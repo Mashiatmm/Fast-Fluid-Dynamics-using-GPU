@@ -34,14 +34,13 @@ void main() {
     vec4 force = vec4(0);
     if (mDown != 0) {
         vec2 orgPos = mpos / res; // original mouse position rescaled
-        vec2 relMmt = rel / res; // relative mouse motion rescaled
+        // vec2 relMmt = rel / res; // relative mouse motion rescaled
         float dist = distance(coords, orgPos);
         float a = 0.12;
         float val = (a / (dist + a)) - 0.5;
         float frm = frame;
         if(dist < 0.15){
-            // force = vec4(val*cos(frm/200), val*sin(frm/100), val*sin(frm/300), 1);
-            force = vec4(val*cos(frm/100), val*sin(frm/100), 0, 1);
+            force = vec4(val*cos(frm/100), val*sin(frm/100), val*sin(frm/100), 1); // the frm helps with changing colors
             force = abs(force);
             force *= 0.7;
 

@@ -1,4 +1,4 @@
-#version 330
+#version 330 
 
 out vec4 fragColor;
 
@@ -19,22 +19,17 @@ uniform sampler2D qntTex; // quantity texture
 float delx = 1 / res.x;
 float dely = 1 / res.y;
 
-
-#define DENSITY 1
-#define VISCOSITY 1
-#define FORCEMULT 0.3
-
-
+// Gradient
+void gradient(vec2 coords, out vec4 uNew, sampler2D p, sampler2D w) {
+    float pL = texture(p, coords - vec2(delx, 0)).x;
+    float pR = texture(p, coords + vec2(delx, 0)).x;
+    float pB = texture(p, coords - vec2(0, dely)).x;
+    float pT = texture(p, coords + vec2(0, dely)).x;
+    
+    uNew = texture(w, coords);
+    uNew.xy -= (res.x / res.y) * 0.5 * vec2(pR - pL, pT - pB);
+}
 
 void main() {
-    vec4 force = vec4(0);
-    if (mDown != 0) {
-        vec2 orgPos = mpos / res; // original mouse position rescaled
-        vec2 relMmt = rel / res; // relative mouse motion rescaled
-
-        vec2 F = relMmt * FORCEMULT;
-
-        force = vec4(F*1/distance(coords, orgPos), 0, 0);
-    }
-    fragColor = texture(velTex, coords) + force;
+    gradient(coords, fragColor, prsTex, velTex);
 }

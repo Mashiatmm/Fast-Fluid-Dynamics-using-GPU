@@ -20,21 +20,15 @@ float delx = 1 / res.x;
 float dely = 1 / res.y;
 
 
-#define DENSITY 1
-#define VISCOSITY 1
-#define FORCEMULT 0.3
+void divergence(vec2 coords, out vec4 div, sampler2D x) {
+    vec4 xL = texture(x, coords - vec2(delx, 0));
+    vec4 xR = texture(x, coords + vec2(delx, 0));
+    vec4 xB = texture(x, coords - vec2(0, dely));
+    vec4 xT = texture(x, coords + vec2(0, dely));
 
-
+    div = vec4((res.x / res.y) * 0.5 * ((xR.x - xL.x) + (xT.y - xB.y)));
+}
 
 void main() {
-    vec4 force = vec4(0);
-    if (mDown != 0) {
-        vec2 orgPos = mpos / res; // original mouse position rescaled
-        vec2 relMmt = rel / res; // relative mouse motion rescaled
-
-        vec2 F = relMmt * FORCEMULT;
-
-        force = vec4(F*1/distance(coords, orgPos), 0, 0);
-    }
-    fragColor = texture(velTex, coords) + force;
+    divergence(coords, fragColor, velTex);
 }

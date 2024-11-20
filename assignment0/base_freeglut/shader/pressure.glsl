@@ -1,4 +1,4 @@
-#version 330
+#version 330 core
 
 out vec4 fragColor;
 
@@ -19,22 +19,20 @@ uniform sampler2D qntTex; // quantity texture
 float delx = 1 / res.x;
 float dely = 1 / res.y;
 
+void jacobi(vec2 coords, out vec4 xNew, float alpha, float rbeta, sampler2D x, sampler2D b) {
+    vec4 xL = texture(x, coords - vec2(delx, 0));
+    vec4 xR = texture(x, coords + vec2(delx, 0));
+    vec4 xB = texture(x, coords - vec2(0, dely));
+    vec4 xT = texture(x, coords + vec2(0, dely));
 
-#define DENSITY 1
-#define VISCOSITY 1
-#define FORCEMULT 0.3
+    vec4 bC = texture(b, coords);
 
-
+    xNew = (xL + xR + xB + xT + alpha * bC) * rbeta;
+}
 
 void main() {
-    vec4 force = vec4(0);
-    if (mDown != 0) {
-        vec2 orgPos = mpos / res; // original mouse position rescaled
-        vec2 relMmt = rel / res; // relative mouse motion rescaled
+    float alpha = -(delx*delx);
+    float rbeta = 0.25;
+    jacobi(coords, fragColor, alpha, rbeta, prsTex, tmpTex);
 
-        vec2 F = relMmt * FORCEMULT;
-
-        force = vec4(F*1/distance(coords, orgPos), 0, 0);
-    }
-    fragColor = texture(velTex, coords) + force;
 }
