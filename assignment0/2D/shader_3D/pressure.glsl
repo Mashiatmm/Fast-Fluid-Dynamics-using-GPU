@@ -1,4 +1,4 @@
-#version 330
+#version 330 core
 
 out vec4 fragColor;
 
@@ -19,16 +19,30 @@ uniform sampler2D qntTex; // quantity texture
 float delx = 1 / res.x;
 float dely = 1 / res.y;
 
-
-void divergence(vec2 coords, out vec4 div, sampler2D x) {
+void jacobi(vec2 coords, out vec4 xNew, float alpha, float rbeta, sampler2D x, sampler2D b) {
     vec4 xL = texture(x, coords - vec2(delx, 0));
     vec4 xR = texture(x, coords + vec2(delx, 0));
     vec4 xB = texture(x, coords - vec2(0, dely));
     vec4 xT = texture(x, coords + vec2(0, dely));
 
-    div = vec4((res.x / res.y) * 0.5 * ((xR.x - xL.x) + (xT.y - xB.y)));
+    vec4 bC = texture(b, coords);
+
+    xNew = (xL + xR + xB + xT + alpha * bC) * rbeta;
 }
 
 void main() {
-    divergence(coords, fragColor, velTex);
+    float alpha = -(delx*delx);
+    float rbeta = 0.25;
+    // jacobi(coords, fragColor, alpha, rbeta, prsTex, tmpTex);
+
+    vec3 xL = texture(prsTex, coords - vec2(delx, 0)).xyz;
+    vec3 xR = texture(prsTex, coords + vec2(delx, 0)).xyz;
+    vec3 xB = texture(prsTex, coords - vec2(0, dely)).xyz;
+    vec3 xT = texture(prsTex, coords + vec2(0, dely)).xyz;
+
+    vec3 bC = texture(tmpTex, coords).xyz;
+
+    vec3 result = (xL + xR + xB + xT + alpha * bC) * rbeta;
+    fragColor = vec4(result, 1.0);
+
 }

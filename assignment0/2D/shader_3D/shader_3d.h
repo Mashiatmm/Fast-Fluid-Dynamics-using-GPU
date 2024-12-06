@@ -29,7 +29,7 @@ class TexturePair {
 
             glGenTextures(1, &TEX);
             glBindTexture(GL_TEXTURE_2D, TEX);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, rx, ry, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, rx, ry, 0, GL_RGBA, GL_FLOAT, NULL);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
@@ -284,8 +284,8 @@ class HomogenousFluidShader{
     int height, width;
     // Shader *frcStep, *difStep, *divStep, *prsStep, *grdStep;
     TexturePair *vel1, *vel2, *tmp, *qnt1, *qnt2, *prs1, *prs2;
-    TexturePair *curVel, *nxtVel, *curQnt, *nxtQnt, *curPrs, *nxtPrs;
-
+    TexturePair *curVel, *nxtVel, *curQnt, *nxtQnt, *curPrs, *nxtPrs, *nxtTmp;
+    mat4 uniXform;
 
 
 
@@ -313,6 +313,7 @@ class HomogenousFluidShader{
         nxtVel = new TexturePair(width, height);
         nxtPrs = new TexturePair(width, height);
         tmp = new TexturePair(width, height);
+        nxtTmp = new TexturePair(width, height);
         curPrs = new TexturePair(width, height);
         curQnt = new TexturePair(width, height);
 
@@ -335,6 +336,8 @@ class HomogenousFluidShader{
         int mDown = mouseDown;
 
         glUseProgram(shader); 
+
+        glUniformMatrix4fv(glGetUniformLocation(shader, "xform"), 1, GL_FALSE, &uniXform[0][0]);
 
         glUniform1f(glGetUniformLocation(shader, "dt"), dt); 
         glUniform2fv(glGetUniformLocation(shader, "res"), 1, &res[0]); 
@@ -397,6 +400,10 @@ class HomogenousFluidShader{
             1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
             1.0f,  1.0f, 0.0f,  1.0f, 1.0f,
             -1.0f,  1.0f, 0.0f,  0.0f, 1.0f
+            // -0.5f, -0.5f, 0.0f,  0.0f, 0.0f,
+            // 0.5f, -0.5f, 0.0f,  1.0f, 0.0f,
+            // 0.5f,  0.5f, 0.0f,  1.0f, 1.0f,
+            // -0.5f,  0.5f, 0.0f,  0.0f, 1.0f
         };
 
         unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
@@ -433,6 +440,33 @@ class HomogenousFluidShader{
         glDeleteBuffers(1, &EBO);
     }
 
+    void printTexture(TexturePair *tex)
+    {
+        GLuint texID = tex->FBO; // Assuming this is the 2D texture you want to print
+        // int width = 256, height = 256; // Your texture's width and height
+        GLubyte* pixels = new GLubyte[width * height * 4]; // RGBA format
+
+        // Bind the 2D texture
+        glBindTexture(GL_TEXTURE_2D, texID);
+
+        // Read the texture data into a buffer
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+        // Print some of the texture values (e.g., top-left corner)
+        for (int y = 0; y < 5; ++y) {  // Loop over the rows
+            for (int x = 0; x < 5; ++x) {  // Loop over the columns
+                int idx = (y * width + x) * 4; // Index for RGBA
+                std::cout << "Pixel (" << x << "," << y << "): "
+                        << "R: " << (float)pixels[idx] << ", "
+                        << "G: " << (float)pixels[idx+1] << ", "
+                        << "B: " << (float)pixels[idx+2] << ", "
+                        << "A: " << (float)pixels[idx+3] << std::endl;
+            }
+        }
+
+        // Clean up
+        delete[] pixels;
+    }
 
     void setTextures()
     {
@@ -503,7 +537,7 @@ class HomogenousFluidShader{
 
     void diffusionStep()
     {
-        for (int i = 0; i < 20; i ++) {
+        for (int i = 0; i < 40; i ++) {
             setShader(diffStep);
             // if( i!= 19){
             //     glBindFramebuffer(GL_FRAMEBUFFER, nxtVel->FBO);
@@ -530,16 +564,20 @@ class HomogenousFluidShader{
     void divergenceStep() {
         setShader(divStep);
         
-        glBindFramebuffer(GL_FRAMEBUFFER, tmp->FBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, nxtTmp->FBO);
 
         setTextures();
         drawQuad();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        TexturePair *temp = nxtTmp;
+        nxtTmp = tmp;
+        tmp = temp;
     }
 
     void pressureStep() {
-        for (int i = 0; i < 40; i ++) {
+        for (int i = 0; i < 30; i ++) {
             setShader(prsStep);
             
             glBindFramebuffer(GL_FRAMEBUFFER, nxtPrs->FBO);

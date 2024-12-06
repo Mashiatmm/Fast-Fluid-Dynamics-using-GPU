@@ -1,5 +1,5 @@
 sources = \
-	main.cpp \
+	main_3d.cpp \
 	mesh.cpp \
 	util.cpp \
 	imgui/imgui_draw.cpp \
