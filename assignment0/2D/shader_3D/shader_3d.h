@@ -10,6 +10,7 @@
 #include <vector>
 #include <utility>
 #include <glm/glm.hpp>
+// #include "cube.h"
 
 using namespace std;
 using namespace glm;
@@ -67,8 +68,8 @@ class TexturePair {
             // Create a data array with (1.0, 1.0, 0.0, 1.0) for each pixel
             std::vector<GLfloat> initialData(rx * ry * 4, 1.0f); // RG = 1.0, BA = 0.0
             for (int i = 0; i < rx * ry; i++) {
-                initialData[i * 4 + 0] = 0.1f; // Red (x-velocity)
-                initialData[i * 4 + 1] = 0.1f; // Green (y-velocity)
+                initialData[i * 4 + 0] = -0.1f; // Red (x-velocity)
+                initialData[i * 4 + 1] = 0.0f; // Green (y-velocity)
                 initialData[i * 4 + 2] = 0.0f; // Blue
                 initialData[i * 4 + 3] = 1.0f; // Alpha
             }
@@ -264,6 +265,67 @@ class Shader {
 };
 
 
+struct Cube {
+    glm::vec3 center;  // Center of the cube
+    glm::vec3 size;    // Half-extents of the cube
+};
+
+Cube cube = { glm::vec3(0, 0, 0), glm::vec3(0.2, 0.2, 0.2) }; // Example
+
+glm::vec3 minBound = cube.center - cube.size;
+glm::vec3 maxBound = cube.center + cube.size;
+
+void drawCube(const Cube& cube) {
+  
+    minBound = cube.center - cube.size;
+    maxBound = cube.center + cube.size;
+
+    GLfloat vertices[] = {
+        // Front face
+        minBound.x, minBound.y, maxBound.z,
+        maxBound.x, minBound.y, maxBound.z,
+        maxBound.x, maxBound.y, maxBound.z,
+        minBound.x, maxBound.y, maxBound.z,
+        // Back face
+        minBound.x, minBound.y, minBound.z,
+        maxBound.x, minBound.y, minBound.z,
+        maxBound.x, maxBound.y, minBound.z,
+        minBound.x, maxBound.y, minBound.z,
+        // Other faces...
+    };
+
+    GLuint indices[] = {
+        // Front face
+        0, 1, 2, 2, 3, 0,
+        // Back face
+        4, 5, 6, 6, 7, 4,
+        // Other faces...
+    };
+
+    GLuint VAO, VBO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+
+    glBindVertexArray(VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glDrawElements(GL_TRIANGLES, sizeof(indices) / sizeof(GLuint), GL_UNSIGNED_INT, 0);
+
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+    glDeleteVertexArrays(1, &VAO);
+}
+
+
 
 class HomogenousFluidShader{
     public:
@@ -280,11 +342,11 @@ class HomogenousFluidShader{
 
     // scene objects
     /* ----- FLUID PLANE ----- */
-    unsigned int advStep, frcStep, diffStep, fluidStep, divStep, prsStep, grdStep, boundaryStep;
+    unsigned int advStep, frcStep, diffStep, fluidStep, divStep, prsStep, grdStep, boundaryStep, cubeStep, cubeBoundaryStep;
     int height, width;
     // Shader *frcStep, *difStep, *divStep, *prsStep, *grdStep;
     TexturePair *vel1, *vel2, *tmp, *qnt1, *qnt2, *prs1, *prs2;
-    TexturePair *curVel, *nxtVel, *curQnt, *nxtQnt, *curPrs, *nxtPrs, *nxtTmp;
+    TexturePair *curVel, *nxtVel, *curQnt, *nxtQnt, *curPrs, *nxtPrs, *nxtTmp, *bdTmp;
     mat4 uniXform;
 
 
@@ -316,6 +378,7 @@ class HomogenousFluidShader{
         nxtTmp = new TexturePair(width, height);
         curPrs = new TexturePair(width, height);
         curQnt = new TexturePair(width, height);
+        bdTmp = new TexturePair(width, height);
 
         frame = 0;
     
@@ -345,6 +408,10 @@ class HomogenousFluidShader{
         glUniform2fv(glGetUniformLocation(shader, "rel"), 1, &rel[0]); 
         glUniform1i(glGetUniformLocation(shader, "frame"), frame);
         glUniform1i(glGetUniformLocation(shader, "mDown"), mDown);
+        // std::cout << cube.size[0] << " " << cube.size[1] << std::endl;
+        glUniform3fv(glGetUniformLocation(shader, "cubeSize"), 1, &cube.size[0]);
+        glUniform3fv(glGetUniformLocation(shader, "cubeCenter"), 1, &cube.center[0]);
+
 
         glUniform1i(glGetUniformLocation(shader, "velTex"), 0);
         glUniform1i(glGetUniformLocation(shader, "tmpTex"), 1); 
@@ -468,7 +535,7 @@ class HomogenousFluidShader{
         delete[] pixels;
     }
 
-    void setTextures()
+    void setTextures(unsigned int shader)
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -484,6 +551,7 @@ class HomogenousFluidShader{
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D, curQnt->TEX);
 
+
     }
 
 
@@ -491,7 +559,7 @@ class HomogenousFluidShader{
         glClear(GL_COLOR_BUFFER_BIT);
         setShader(fluidStep);
         
-        setTextures();
+        setTextures(fluidStep);
 
         drawQuad();
     }
@@ -504,7 +572,7 @@ class HomogenousFluidShader{
         // // Bind the framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, nxtQnt->FBO);
         // Set texture units and bind textures
-        setTextures();
+        setTextures(advStep);
         drawQuad();
 
         // Unbind the framebuffer and VAO
@@ -522,7 +590,7 @@ class HomogenousFluidShader{
     
         glBindFramebuffer(GL_FRAMEBUFFER, nxtVel->FBO);
 
-        setTextures();
+        setTextures(frcStep);
 
         drawQuad();
 
@@ -545,7 +613,7 @@ class HomogenousFluidShader{
             // }
             glBindFramebuffer(GL_FRAMEBUFFER, nxtVel->FBO);
 
-            setTextures();
+            setTextures(diffStep);
 
             drawQuad();
 
@@ -566,7 +634,7 @@ class HomogenousFluidShader{
         
         glBindFramebuffer(GL_FRAMEBUFFER, nxtTmp->FBO);
 
-        setTextures();
+        setTextures(divStep);
         drawQuad();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -582,7 +650,7 @@ class HomogenousFluidShader{
             
             glBindFramebuffer(GL_FRAMEBUFFER, nxtPrs->FBO);
 
-            setTextures();
+            setTextures(prsStep);
 
             drawQuad();
 
@@ -600,7 +668,7 @@ class HomogenousFluidShader{
     
         glBindFramebuffer(GL_FRAMEBUFFER, nxtVel->FBO);
 
-        setTextures();
+        setTextures(grdStep);
         drawQuad();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -613,13 +681,17 @@ class HomogenousFluidShader{
     void boundaryVelStep(TexturePair *field, float scale)
     {
         setShader(boundaryStep);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // glBindFramebuffer(GL_FRAMEBUFFER, nxtVel->FBO);
+
         glUniform1f(glGetUniformLocation(boundaryStep, "scale"), scale); 
         glm::vec2 rdv = glm::vec2(1.0 / width, 1.0 / height);
         glUniform2fv(glGetUniformLocation(boundaryStep, "rdv"), 1, &rdv[0]); 
         glUniform1i(glGetUniformLocation(boundaryStep, "field"), 4);
 
 
-        // glBindFramebuffer(GL_FRAMEBUFFER, nxtVel->FBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, bdTmp->FBO);
         float outer_vertices[] =
         {
             -1.0f, -1.0f, 0.0f, 
@@ -634,7 +706,9 @@ class HomogenousFluidShader{
         unsigned int right[] = { 0, 1 };
 
 
-        setTextures();
+        setTextures(boundaryStep);
+
+        glUniform1i(glGetUniformLocation(boundaryStep, "field"), 4);
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, field->TEX);
         glm::vec2 offset = glm::vec2(0, -1);
@@ -656,29 +730,47 @@ class HomogenousFluidShader{
         glUniform2fv(glGetUniformLocation(boundaryStep, "offset"), 1, &offset[0]); 
         drawBorder(outer_vertices, 12, left, 2);
 
-        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // TexturePair* temp = nxtVel;
-        // nxtVel = curVel;
-        // curVel = temp;
+        TexturePair* temp = bdTmp;
+        bdTmp = field;
+        field = bdTmp;
     }
 
-    void boundaryPressureStep()
+
+    void drawCubeStep()
     {
-        setShader(boundaryStep);
-        glUniform1f(glGetUniformLocation(boundaryStep, "scale"), 1); 
+        glUseProgram(cubeStep);
+        // glClear(GL_COLOR_BUFFER_BIT);
 
+        // Set the cube's color (e.g., red)
+        glUniformMatrix4fv(glGetUniformLocation(cubeStep, "xform"), 1, GL_FALSE, &uniXform[0][0]);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, nxtPrs->FBO);
+        GLint colorLoc = glGetUniformLocation(cubeStep, "cubeColor");
+        glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f); 
+        drawCube(cube);
+    }
 
-        setTextures();
+    void cubeBoundaryVelStep(){
+        glUseProgram(cubeBoundaryStep);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, nxtVel->FBO);
+
+        glUniform3fv(glGetUniformLocation(cubeBoundaryStep, "cubeCenter"), 1, &cube.center[0]);
+        glUniform3fv(glGetUniformLocation(cubeBoundaryStep, "cubeSize"), 1, &cube.size[0]);
+        glUniform1i(glGetUniformLocation(cubeBoundaryStep, "velTex"), 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, curVel->TEX);
+
         drawQuad();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        TexturePair* temp = nxtPrs;
-        nxtPrs = curPrs;
-        curPrs = temp;
+        TexturePair* temp = nxtVel;
+        nxtVel = curVel;
+        curVel = temp;
+
     }
 
 

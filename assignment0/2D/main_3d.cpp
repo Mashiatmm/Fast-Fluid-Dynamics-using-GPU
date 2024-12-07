@@ -23,6 +23,9 @@ GLFWwindow* window;
 std::chrono::_V2::steady_clock::time_point lastT;
 Shader* fluidShader;
 bool mouseCal;
+bool onlyAdvection = false;
+bool tillDiffusion = false;
+bool addBox = false;
 
 
 
@@ -184,6 +187,9 @@ void setShaders()
     unsigned int pressureFragShader = compileShader("shader_3D/pressure.glsl", GL_FRAGMENT_SHADER);
     unsigned int gradientShader = compileShader("shader_3D/gradient.glsl", GL_FRAGMENT_SHADER);
     unsigned int boundaryShader = compileShader("shader_3D/boundary.glsl", GL_FRAGMENT_SHADER);
+    unsigned int cubeVShader = compileShader("shader_3D/cube_vs.glsl", GL_VERTEX_SHADER);
+    unsigned int cubeFShader = compileShader("shader_3D/cube_fs.glsl", GL_FRAGMENT_SHADER);
+    unsigned int boundCubeFShader = compileShader("shader_3D/boundary_cube.glsl", GL_FRAGMENT_SHADER);
 
     hfShader->advStep = glCreateProgram();
     glAttachShader(hfShader->advStep, fluidVShader);
@@ -225,15 +231,33 @@ void setShaders()
     glAttachShader(hfShader->boundaryStep, boundaryShader);
     glLinkProgram(hfShader->boundaryStep);
 
-    glm::mat4 xform;
-    float aspect = (float)SCR_WIDTH / (float)SCR_HEIGHT;
-    // Create perspective projection matrix
-    mat4 proj = glm::perspective(45.0f, aspect, 0.0f, 100.0f);
-    // Create view transformation matrix
-    mat4 view = glm::translate(mat4(1.0f), vec3(0.0, 0.0, -2.0)); 
-    // mat4 rot = rotate(mat4(1.0f), radians(camCoords.y), vec3(1.0, 0.0, 0.0));
-    // rot = rotate(rot, radians(camCoords.x), vec3(0.0, 1.0, 0.0));
-    xform = proj * view;
+    hfShader->cubeBoundaryStep = glCreateProgram();
+    glAttachShader(hfShader->cubeBoundaryStep, fluidVShader);
+    glAttachShader(hfShader->cubeBoundaryStep, boundCubeFShader);
+    glLinkProgram(hfShader->cubeBoundaryStep);
+
+    hfShader->cubeStep = glCreateProgram();
+    glAttachShader(hfShader->cubeStep, cubeVShader);
+    glAttachShader(hfShader->cubeStep, cubeFShader);
+    glLinkProgram(hfShader->cubeStep);
+
+    // glm::mat4 xform;
+    // float aspect = (float)SCR_WIDTH / (float)SCR_HEIGHT;
+    // // Create perspective projection matrix
+    // mat4 proj = glm::perspective(45.0f, aspect, 0.0f, 100.0f);
+    // // Create view transformation matrix
+    // mat4 view = glm::translate(mat4(1.0f), vec3(0.0, 0.0, -2.0)); 
+    // // mat4 rot = rotate(mat4(1.0f), radians(camCoords.y), vec3(1.0, 0.0, 0.0));
+    // // rot = rotate(rot, radians(camCoords.x), vec3(0.0, 1.0, 0.0));
+    // xform = proj * view;
+    // glm::mat4 xform = glm::mat4(1.0f);               // Identity matrix
+    // xform = glm::translate(xform, glm::vec3(0.0f));  // Center it at origin
+    // xform = glm::scale(xform, glm::vec3(0.5f)); 
+
+    glm::mat4 orthoProj = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 10.0f);
+    glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+    glm::mat4 xform = orthoProj * view;
+
     hfShader->uniXform = xform;
 
     glDeleteShader(fluidVShader);
@@ -245,6 +269,9 @@ void setShaders()
     glDeleteShader(gradientShader);
     glDeleteShader(fluidFragShader);
     glDeleteShader(boundaryShader);
+    glDeleteShader(cubeVShader);
+    glDeleteShader(cubeFShader);
+    glDeleteShader(boundCubeFShader);
 }
 
 void display()
@@ -259,10 +286,52 @@ void display()
         ImGui::NewFrame();
 
         // ImGui window with a button
-        ImGui::Begin("Hello, ImGui!");
-        if (ImGui::Button("Click Me")) {
-            std::cout << "Button Clicked!" << std::endl;
+        ImGui::Begin("ImGui!");
+        
+
+      
+
+
+        if(ImGui::Checkbox("Only Advection", &onlyAdvection)) {
+        // Action when the checkbox state changes
+            if (onlyAdvection) {
+                tillDiffusion = false;
+            } 
         }
+        if(ImGui::Checkbox("Till Diffusion", &tillDiffusion)) {
+        // Action when the checkbox state changes
+            if (tillDiffusion) {
+                onlyAdvection = false;
+            } 
+        }
+
+        if(ImGui::Checkbox("Add Box", &addBox)) {
+            if(addBox){}
+        }
+
+          // A variable to control
+        float value = 0.0f;  // Initial value
+        float minVal = -1.0f; // Minimum value
+        float maxVal = 1.0f; // Maximum value
+
+        // Optional: Slider for visual clarity
+        ImGui::Text("Move box left and right");
+        if (ImGui::SliderFloat("LR", &value, minVal, maxVal, "%.3f")) {
+            // Action when the slider value changes
+            cube.center.x = value;
+        }
+
+          // A variable to control
+        float up = 0.0f;  // Initial value
+        float upMax = 1.0f;
+        float downMax = -1.0f;
+        // Optional: Slider for visual clarity
+        ImGui::Text("Move box up and down");
+        if (ImGui::SliderFloat("UpDown", &up, upMax, downMax, "%.3f")) {
+            // Action when the slider value changes
+            cube.center.y = up;
+        }
+
         ImGui::End();
 
         auto curT = std::chrono::steady_clock::now();
@@ -298,14 +367,32 @@ void display()
 
 
         hfShader->advectionStep();
-        hfShader->forceStep();
-        hfShader->diffusionStep();
-        hfShader->divergenceStep();
-        hfShader->pressureStep();
-        hfShader->gradientStep();
-        hfShader->boundaryVelStep(hfShader->curVel, -1.0);
-        hfShader->boundaryVelStep(hfShader->curPrs, 1);
+        
+        if( onlyAdvection == 0){
+            hfShader->forceStep();
+            hfShader->diffusionStep();
+            if(tillDiffusion == 0){
+
+                hfShader->divergenceStep();
+                hfShader->pressureStep();
+                hfShader->boundaryVelStep(hfShader->curPrs, 1);
+
+                hfShader->gradientStep();
+                hfShader->boundaryVelStep(hfShader->curVel, -1.0);
+            }
+        }
+        // hfShader->cubeBoundaryVelStep();
         hfShader->visFluidStep();
+        if(addBox == false){
+            // std::cout << "inside " << std::endl;
+            cube.size = vec3(0, 0, 0);
+        }
+        else{
+            cube.size = vec3(0.2, 0.2, 0.2);
+            hfShader->drawCubeStep();
+        }
+
+
         // hfShader->visualizeGBuffer(hfShader->nxtVel->FBO);
         // hfShader->printTexture(hfShader->curPrs);
         // Render ImGui
