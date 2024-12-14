@@ -1,4 +1,7 @@
 # Demo
+>physics simulation,
+>gpu programming
+
 Navier Stokes Implementation of fast fluid dynamics based on GPU Gems 1: Chapter 38 (by Mark J. Harris).
 
 LOSSY GIF, LOW RESOLUTION!!  For proper visualization, download and setup the file
